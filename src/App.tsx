@@ -5,6 +5,7 @@ import { AgentColumn } from "./components/AgentColumn";
 import { TopBar } from "./components/TopBar";
 import { StatusBar } from "./components/StatusBar";
 import { AddAgentModal } from "./components/AddAgentModal";
+import { LoginScreen, isAuthenticated, getStoredToken } from "./components/LoginScreen";
 import type { AgentConfig } from "./types";
 import { themes, applyTheme } from "./themes";
 import "./App.css";
@@ -39,22 +40,22 @@ const AGENT_ACCENTS = [
   "#2dd4bf",
 ];
 
-function buildDefaultAgents(count: number): AgentConfig[] {
-  return Array.from({ length: count }, (_, i) => {
-    // First agent uses "main" (default agent in OpenClaw)
-    const agentId = i === 0 ? "main" : `agent-${i + 1}`;
-    const agentName = i === 0 ? "Main" : `Agent ${i + 1}`;
-    
-    return {
-      id: agentId,
-      name: agentName,
-      icon: String(i + 1),
-      accent: AGENT_ACCENTS[i % AGENT_ACCENTS.length],
-      context: "",
-      model: "claude-sonnet-4-5",
-    };
-  });
-}
+// All default sessions — numbered agents + named persistent sessions
+const DEFAULT_AGENTS: AgentConfig[] = [
+  { id: "main",                   name: "Main",              icon: "1",  accent: AGENT_ACCENTS[0],  context: "",                        model: "anthropic/claude-opus-4-6"   },
+  { id: "agent-2",                name: "Agent 2",           icon: "2",  accent: AGENT_ACCENTS[1],  context: "",                        model: "anthropic/claude-opus-4-6"   },
+  { id: "agent-3",                name: "Agent 3",           icon: "3",  accent: AGENT_ACCENTS[2],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
+  { id: "agent-4",                name: "Agent 4",           icon: "4",  accent: AGENT_ACCENTS[3],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
+  { id: "agent-5",                name: "Agent 5",           icon: "5",  accent: AGENT_ACCENTS[4],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
+  { id: "agent-6",                name: "Agent 6",           icon: "6",  accent: AGENT_ACCENTS[5],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
+  { id: "agent-7",                name: "Agent 7",           icon: "7",  accent: AGENT_ACCENTS[6],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
+  { id: "backup",                 name: "Backup",            icon: "💾", accent: AGENT_ACCENTS[7],  context: "Backup & recovery tasks", model: "anthropic/claude-sonnet-4-6" },
+  { id: "skills",                 name: "Skills",            icon: "🛠", accent: AGENT_ACCENTS[8],  context: "Skill building & tooling", model: "anthropic/claude-sonnet-4-6" },
+  { id: "research-agent",         name: "Research",          icon: "🔬", accent: AGENT_ACCENTS[9],  context: "Deep research & analysis", model: "anthropic/claude-opus-4-6"   },
+  { id: "visionaire-labs",        name: "Visionaire Labs",   icon: "🧠", accent: AGENT_ACCENTS[10], context: "Visionaire Labs strategy", model: "anthropic/claude-opus-4-6"   },
+  { id: "github",                 name: "GitHub",            icon: "🐙", accent: AGENT_ACCENTS[11], context: "GitHub & code ops",        model: "anthropic/claude-sonnet-4-6" },
+  { id: "visionaire-ai-x-posts",  name: "X Posts",           icon: "𝕏",  accent: AGENT_ACCENTS[0],  context: "X/Twitter content",       model: "anthropic/claude-sonnet-4-6" },
+];
 
 function getGatewayConfig() {
   const params = new URLSearchParams(window.location.search);
@@ -79,16 +80,22 @@ function getGatewayConfig() {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(() => isAuthenticated());
   const [activeTab, setActiveTab] = useState("All Agents");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [initialAgents] = useState<AgentConfig[]>(() =>
-    buildDefaultAgents(7)
-  );
+  // Use persisted agents if available, otherwise fall back to all defaults
+  const persistedAgents = useDeckStore((s) => (s as any).persistedAgents as AgentConfig[] | undefined);
+  const [initialAgents] = useState<AgentConfig[]>(() => {
+    if (persistedAgents && persistedAgents.length > 0) return persistedAgents;
+    return DEFAULT_AGENTS;
+  });
   const columnOrder = useDeckStore((s) => s.columnOrder);
   const createAgentOnGateway = useDeckStore((s) => s.createAgentOnGateway);
   const theme = useDeckStore((s) => s.theme);
 
-  const { gatewayUrl, token } = getGatewayConfig();
+  const { gatewayUrl, token: configToken } = getGatewayConfig();
+  // Prefer token from login screen (stored after password validation)
+  const token = getStoredToken() || configToken;
 
   // Apply theme on mount and when it changes
   useEffect(() => {
@@ -102,6 +109,7 @@ export default function App() {
     gatewayUrl,
     token,
     agents: initialAgents,
+    skip: !authed,
   });
 
   // Cmd+1-9 to focus column inputs
@@ -124,6 +132,10 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  if (!authed) {
+    return <LoginScreen onSuccess={() => setAuthed(true)} />;
+  }
 
   return (
     <div className="deck-root">

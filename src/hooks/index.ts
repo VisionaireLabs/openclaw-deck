@@ -5,21 +5,25 @@ import type { AgentConfig, DeckConfig } from "../types";
 /**
  * Initialize the deck with config. Call once at app root.
  */
-export function useDeckInit(config: Partial<DeckConfig>) {
+export function useDeckInit(config: Partial<DeckConfig> & { skip?: boolean }) {
   const initialize = useDeckStore((s) => s.initialize);
   const disconnect = useDeckStore((s) => s.disconnect);
   const initialized = useRef(false);
+  const { skip, ...deckConfig } = config;
 
   useEffect(() => {
+    if (skip) return;
     if (!initialized.current) {
       initialized.current = true;
-      initialize(config);
+      initialize(deckConfig);
     }
     return () => {
-      initialized.current = false;
-      disconnect();
+      if (!skip) {
+        initialized.current = false;
+        disconnect();
+      }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [skip]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /**

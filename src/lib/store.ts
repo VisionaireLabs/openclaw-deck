@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   AgentConfig,
   AgentSession,
@@ -14,8 +15,8 @@ import { themes, applyTheme } from "../themes";
 // ─── Default Config ───
 
 const DEFAULT_CONFIG: DeckConfig = {
-  gatewayUrl: "ws://127.0.0.1:18789",
-  token: undefined,
+  gatewayUrl: import.meta.env.VITE_GATEWAY_URL || "wss://gateway.visionaire.co",
+  token: import.meta.env.VITE_GATEWAY_TOKEN || "",
   agents: [],
 };
 
@@ -43,6 +44,7 @@ interface DeckStore {
   deleteAgentOnGateway: (agentId: string) => Promise<void>;
   disconnect: () => void;
   setTheme: (themeId: string) => void;
+  loadHistory: () => Promise<void>;
 }
 
 // ─── Helpers ───
@@ -64,7 +66,9 @@ function makeId(): string {
 
 // ─── Store ───
 
-export const useDeckStore = create<DeckStore>((set, get) => ({
+export const useDeckStore = create<DeckStore>()(
+  persist(
+  (set, get) => ({
   config: DEFAULT_CONFIG,
   sessions: {},
   gatewayConnected: false,
@@ -96,6 +100,8 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
             sessions[id] = { ...sessions[id], connected: true };
           }
           set({ sessions });
+          // Load chat history for all agent columns
+          get().loadHistory();
         }
       },
     });
@@ -408,6 +414,9 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       console.warn("[DeckStore] Gateway createAgent failed, adding locally:", err);
     }
     get().addAgent(agent);
+    // Load history for the newly added column — loadHistory skips columns
+    // that already have messages so this is safe to call at any time.
+    await get().loadHistory();
   },
 
   deleteAgentOnGateway: async (agentId) => {
@@ -422,6 +431,71 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
     get().removeAgent(agentId);
   },
 
+  loadHistory: async () => {
+    const { client, sessions } = get();
+    if (!client?.connected) return;
+
+    for (const agentId of Object.keys(sessions)) {
+      const sessionKey = `agent:main:${agentId}`;
+      try {
+        const result = (await client.request("chat.history", {
+          sessionKey,
+          limit: 200,
+        })) as { messages?: Array<{ role: string; content?: unknown; text?: string; timestamp?: number }> } | null;
+
+        const rawMessages = result?.messages;
+        if (!Array.isArray(rawMessages) || rawMessages.length === 0) continue;
+
+        // Convert gateway history format to Deck ChatMessage format
+        const messages: ChatMessage[] = [];
+        for (const msg of rawMessages) {
+          if (msg.role !== "user" && msg.role !== "assistant") continue;
+          // Extract text from content (could be string or content blocks)
+          let text = "";
+          if (typeof msg.text === "string") {
+            text = msg.text;
+          } else if (typeof msg.content === "string") {
+            text = msg.content;
+          } else if (Array.isArray(msg.content)) {
+            text = (msg.content as Array<{ type?: string; text?: string }>)
+              .filter((b) => b.type === "text" && typeof b.text === "string")
+              .map((b) => b.text!)
+              .join("\n");
+          }
+          if (!text.trim()) continue;
+
+          messages.push({
+            id: makeId(),
+            role: msg.role as "user" | "assistant",
+            text,
+            timestamp: msg.timestamp ?? Date.now(),
+            streaming: false,
+          });
+        }
+
+        if (messages.length > 0) {
+          set((state) => {
+            const session = state.sessions[agentId];
+            if (!session) return state;
+            // Only load history if session has no messages yet (fresh page load)
+            if (session.messages.length > 0) return state;
+            return {
+              sessions: {
+                ...state.sessions,
+                [agentId]: {
+                  ...session,
+                  messages,
+                },
+              },
+            };
+          });
+        }
+      } catch (err) {
+        console.warn(`[DeckStore] Failed to load history for ${agentId}:`, err);
+      }
+    }
+  },
+
   disconnect: () => {
     get().client?.disconnect();
     set({ gatewayConnected: false, client: null });
@@ -434,4 +508,15 @@ export const useDeckStore = create<DeckStore>((set, get) => ({
       applyTheme(theme);
     }
   },
-}));
+  }),
+  {
+    name: "openclaw-deck-config",
+    storage: createJSONStorage(() => localStorage),
+    // Only persist layout + agent configs + theme. Never persist live state (messages, client, status).
+    partialize: (state) => ({
+      columnOrder: state.columnOrder,
+      theme: state.theme,
+      persistedAgents: state.config.agents,
+    }),
+  }
+));

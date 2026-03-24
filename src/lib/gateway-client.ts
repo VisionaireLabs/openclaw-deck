@@ -60,6 +60,8 @@ export class GatewayClient {
   private pending = new Map<string, PendingRequest>();
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _challengeTimer: ReturnType<typeof setTimeout> | null = null;
+  private _handshakeDone = false;
   private intentionalClose = false;
   private _connected = false;
   private msgCounter = 0;
@@ -83,6 +85,7 @@ export class GatewayClient {
   /** Open the WebSocket connection and perform the handshake */
   connect(): void {
     this.intentionalClose = false;
+    this._handshakeDone = false;
     this.createSocket();
   }
 
@@ -141,7 +144,7 @@ export class GatewayClient {
   }
 
   /**
-   * Run an agent turn. Sends `req:agent` and returns the initial ack.
+   * Run an agent turn via chat.send. Returns the idempotency key as runId.
    * Streaming content arrives as `event:agent` frames via onEvent.
    */
   async runAgent(
@@ -153,14 +156,14 @@ export class GatewayClient {
       .toString(36)
       .slice(2, 8)}`;
 
-    const result = await this.request("agent", {
-      agentId,
+    await this.request("chat.send", {
+      sessionKey: sessionKey ?? `agent:main:${agentId}`,
       message,
-      sessionKey,
+      deliver: false,
       idempotencyKey,
     });
 
-    return result as { runId: string; status: string };
+    return { runId: idempotencyKey, status: "ok" };
   }
 
   /**
@@ -226,46 +229,16 @@ export class GatewayClient {
       return;
     }
 
-    this.ws.onopen = async () => {
-      console.log("[GatewayClient] Socket opened, sending handshake...");
-      try {
-        let device: { id: string; publicKey: string; signature: string; signedAt: number } | undefined;
-        try {
-          device = await this.buildSignedDeviceIdentity();
-        } catch (deviceErr) {
-          console.warn("[GatewayClient] Device identity unavailable; falling back to token-only auth:", deviceErr);
-        }
-
-        const hello = (await this.request("connect", {
-          client: {
-            id: "gateway-client",
-            version: "2026.2.16",
-            platform: "web",
-            mode: "webchat",
-          },
-          minProtocol: 3,
-          maxProtocol: 3,
-          role: "operator",
-          scopes: OPERATOR_SCOPES,
-          auth: this.getPreferredAuthToken()
-            ? { token: this.getPreferredAuthToken() }
-            : undefined,
-          ...(device ? { device } : {}),
-        })) as { auth?: { deviceToken?: string } };
-
-        const issuedDeviceToken = hello?.auth?.deviceToken;
-        if (issuedDeviceToken) {
-          this.storeDeviceToken(issuedDeviceToken);
-        }
-
-        this._connected = true;
-        this.reconnectAttempts = 0;
-        this.options.onConnection(true);
-        console.log("[GatewayClient] Connected to gateway");
-      } catch (err) {
-        console.error("[GatewayClient] Handshake failed:", err);
-        this.ws?.close(4001, "handshake failed");
-      }
+    this.ws.onopen = () => {
+      console.log("[GatewayClient] Socket opened, waiting for connect.challenge...");
+      // The gateway sends a connect.challenge event first — we wait for it
+      // before sending our connect request. The challenge handler is in
+      // handleFrame, which calls completeHandshake when the challenge arrives.
+      // Set a timeout in case the challenge never comes (older gateway).
+      this._challengeTimer = setTimeout(() => {
+        console.log("[GatewayClient] No challenge received, attempting connect without nonce...");
+        this.completeHandshake(undefined);
+      }, 3000);
     };
 
     this.ws.onmessage = (evt) => {
@@ -314,11 +287,74 @@ export class GatewayClient {
         break;
       }
       case "event": {
+        // Intercept connect.challenge before forwarding to app
+        if (
+          frame.event === "connect.challenge" &&
+          !this._handshakeDone
+        ) {
+          const nonce = (frame.payload as Record<string, unknown>)
+            ?.nonce as string | undefined;
+          console.log("[GatewayClient] Received connect.challenge, nonce:", nonce?.slice(0, 8) + "...");
+          if (this._challengeTimer) {
+            clearTimeout(this._challengeTimer);
+            this._challengeTimer = null;
+          }
+          this.completeHandshake(nonce);
+          break;
+        }
         this.options.onEvent(frame);
         break;
       }
       default:
         break;
+    }
+  }
+
+  private async completeHandshake(nonce: string | undefined): Promise<void> {
+    if (this._handshakeDone) return;
+    this._handshakeDone = true;
+    try {
+      let device:
+        | { id: string; publicKey: string; signature: string; signedAt: number; nonce?: string }
+        | undefined;
+      try {
+        device = await this.buildSignedDeviceIdentity(nonce);
+      } catch (deviceErr) {
+        console.warn(
+          "[GatewayClient] Device identity unavailable; falling back to token-only auth:",
+          deviceErr
+        );
+      }
+
+      const hello = (await this.request("connect", {
+        client: {
+          id: "gateway-client",
+          version: "2026.3.8",
+          platform: "web",
+          mode: "webchat",
+        },
+        minProtocol: 3,
+        maxProtocol: 3,
+        role: "operator",
+        scopes: OPERATOR_SCOPES,
+        auth: this.getPreferredAuthToken()
+          ? { token: this.getPreferredAuthToken() }
+          : undefined,
+        ...(device ? { device } : {}),
+      })) as { auth?: { deviceToken?: string } };
+
+      const issuedDeviceToken = hello?.auth?.deviceToken;
+      if (issuedDeviceToken) {
+        this.storeDeviceToken(issuedDeviceToken);
+      }
+
+      this._connected = true;
+      this.reconnectAttempts = 0;
+      this.options.onConnection(true);
+      console.log("[GatewayClient] Connected to gateway");
+    } catch (err) {
+      console.error("[GatewayClient] Handshake failed:", err);
+      this.ws?.close(4001, "handshake failed");
     }
   }
 
@@ -377,17 +413,18 @@ export class GatewayClient {
     return this.getStoredDeviceToken() || this.options.token || "";
   }
 
-  private async buildSignedDeviceIdentity(): Promise<{
+  private async buildSignedDeviceIdentity(nonce?: string): Promise<{
     id: string;
     publicKey: string;
     signature: string;
     signedAt: number;
+    nonce?: string;
   }> {
     const identity = await this.loadOrCreateDeviceIdentity();
     const signedAt = Date.now();
 
     const payload = this.buildDeviceAuthPayload({
-      version: "v1",
+      version: nonce ? "v2" : "v1",
       deviceId: identity.id,
       clientId: "gateway-client",
       clientMode: "webchat",
@@ -395,6 +432,7 @@ export class GatewayClient {
       scopes: OPERATOR_SCOPES,
       signedAtMs: signedAt,
       token: this.getPreferredAuthToken() || null,
+      nonce,
     });
 
     const key = await crypto.subtle.importKey(
@@ -416,6 +454,7 @@ export class GatewayClient {
       publicKey: identity.publicKey,
       signature: this.base64UrlEncode(new Uint8Array(signature)),
       signedAt,
+      ...(nonce ? { nonce } : {}),
     };
   }
 
