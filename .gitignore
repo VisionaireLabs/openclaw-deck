@@ -42,3 +42,4 @@ Thumbs.db
 # ClawHub
 .clawhub
 .vercel
+.env.bak-rotate-*

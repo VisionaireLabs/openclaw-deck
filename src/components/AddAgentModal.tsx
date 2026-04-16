@@ -14,8 +14,26 @@ const ACCENTS = [
 ];
 
 const MODELS = [
-  "claude-sonnet-4-5",
-  "claude-opus-4-6",
+  // Anthropic (direct) — quality tier
+  "anthropic/claude-opus-4-7",
+  "anthropic/claude-opus-4-6",
+  "anthropic/claude-sonnet-4-6",
+  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-haiku-4-5",
+  // Google
+  "google/gemini-2.5-pro",
+  "google/gemini-2.5-flash",
+  // NVIDIA NIM
+  "nvidia/nvidia/nemotron-3-super-120b-a12b",
+  "nvidia/nvidia/nemotron-3-nano-30b-a3b",
+  // Ollama (free, local/cloud)
+  "ollama/deepseek-v3.2",
+  "ollama/kimi-k2.5",
+  "ollama/glm-5",
+  "ollama/minimax-m2.7",
+  "ollama/qwen3-coder:480b",
+  "ollama/devstral-2:123b",
+  "ollama/ministral-3:8b",
 ];
 
 export function AddAgentModal({
