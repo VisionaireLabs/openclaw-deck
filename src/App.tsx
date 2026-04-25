@@ -43,7 +43,7 @@ const AGENT_ACCENTS = [
 // All default sessions — numbered agents + named persistent sessions
 const DEFAULT_AGENTS: AgentConfig[] = [
   { id: "main",                   name: "Main",              icon: "1",  accent: AGENT_ACCENTS[0],  context: "",                        model: "anthropic/claude-opus-4-7"   },
-  { id: "agent-2",                name: "Agent 2",           icon: "2",  accent: AGENT_ACCENTS[1],  context: "",                        model: "anthropic/claude-opus-4-6"   },
+  { id: "agent-2",                name: "Agent 2",           icon: "2",  accent: AGENT_ACCENTS[1],  context: "",                        model: "anthropic/claude-opus-4-7"   },
   { id: "agent-3",                name: "Agent 3",           icon: "3",  accent: AGENT_ACCENTS[2],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
   { id: "agent-4",                name: "Agent 4",           icon: "4",  accent: AGENT_ACCENTS[3],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
   { id: "agent-5",                name: "Agent 5",           icon: "5",  accent: AGENT_ACCENTS[4],  context: "",                        model: "anthropic/claude-sonnet-4-6" },
