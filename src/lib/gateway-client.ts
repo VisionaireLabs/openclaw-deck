@@ -333,8 +333,8 @@ export class GatewayClient {
           platform: "web",
           mode: "webchat",
         },
-        minProtocol: 3,
-        maxProtocol: 3,
+        minProtocol: 4,
+        maxProtocol: 4,
         role: "operator",
         scopes: OPERATOR_SCOPES,
         auth: this.getPreferredAuthToken()
