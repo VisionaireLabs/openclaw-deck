@@ -434,6 +434,35 @@ export const themes: Record<string, Theme> = {
     }
   },
 
+  mono: {
+    id: 'mono',
+    variant: 'dark' as const,
+    name: 'Mono',
+    colors: {
+      bg: '#080808',
+      bgSecondary: '#111111',
+      bgTertiary: '#000000',
+      text: 'rgba(255, 255, 255, 0.92)',
+      textSecondary: 'rgba(255, 255, 255, 0.65)',
+      textMuted: 'rgba(255, 255, 255, 0.38)',
+      border: 'rgba(255, 255, 255, 0.09)',
+      borderLight: 'rgba(255, 255, 255, 0.05)',
+      scrollbar: 'rgba(255, 255, 255, 0.14)',
+      scrollbarTrack: 'rgba(255, 255, 255, 0.03)',
+      columnBg: 'rgba(255, 255, 255, 0.03)',
+      columnBgAlt: 'rgba(255, 255, 255, 0.05)',
+      columnHover: 'rgba(255, 255, 255, 0.02)',
+      headerBg: 'rgba(255, 255, 255, 0.04)',
+      inputBg: 'rgba(255, 255, 255, 0.06)',
+      inputBorder: 'rgba(255, 255, 255, 0.11)',
+      inputFocus: 'rgba(255, 255, 255, 0.22)',
+      codeBg: 'rgba(255, 255, 255, 0.06)',
+      codeBlockBg: 'rgba(255, 255, 255, 0.08)',
+      quoteBorder: 'rgba(255, 255, 255, 0.22)',
+      link: 'rgba(255, 255, 255, 0.75)',
+    }
+  },
+
   oledBlack: {
     id: 'oledBlack',
     variant: 'dark' as const,
@@ -474,4 +503,3 @@ export function applyTheme(theme: Theme) {
   Object.entries(theme.colors).forEach(([key, value]) => {
     root.style.setProperty(`--theme-${key}`, value);
   });
-}
