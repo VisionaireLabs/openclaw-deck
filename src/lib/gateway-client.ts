@@ -150,7 +150,8 @@ export class GatewayClient {
   async runAgent(
     agentId: string,
     message: string,
-    sessionKey?: string
+    sessionKey?: string,
+    attachments?: Array<{ fileName: string; content: string; mimeType: string }>
   ): Promise<{ runId: string; status: string }> {
     const idempotencyKey = `agent-${Date.now()}-${Math.random()
       .toString(36)
@@ -161,6 +162,7 @@ export class GatewayClient {
       message,
       deliver: false,
       idempotencyKey,
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
     });
 
     return { runId: idempotencyKey, status: "ok" };

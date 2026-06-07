@@ -35,7 +35,7 @@ interface DeckStore {
   addAgent: (agent: AgentConfig) => void;
   removeAgent: (agentId: string) => void;
   reorderColumns: (order: string[]) => void;
-  sendMessage: (agentId: string, text: string) => Promise<void>;
+  sendMessage: (agentId: string, text: string, attachments?: Array<{ fileName: string; content: string; mimeType: string }>) => Promise<void>;
   setAgentStatus: (agentId: string, status: AgentStatus) => void;
   appendMessageChunk: (agentId: string, runId: string, chunk: string) => void;
   finalizeMessage: (agentId: string, runId: string) => void;
@@ -140,7 +140,7 @@ export const useDeckStore = create<DeckStore>()(
 
   reorderColumns: (order) => set({ columnOrder: order }),
 
-  sendMessage: async (agentId, text) => {
+  sendMessage: async (agentId, text, attachments) => {
     const { client, sessions } = get();
     if (!client?.connected) {
       console.error("Gateway not connected");
@@ -153,6 +153,11 @@ export const useDeckStore = create<DeckStore>()(
       role: "user",
       text,
       timestamp: Date.now(),
+      attachments: attachments?.map((a) => ({
+        name: a.fileName,
+        dataUrl: `data:${a.mimeType};base64,${a.content}`,
+        mimeType: a.mimeType,
+      })),
     };
 
     const session = sessions[agentId];
@@ -173,7 +178,7 @@ export const useDeckStore = create<DeckStore>()(
       // All columns route through the default "main" agent on the gateway,
       // using distinct session keys to keep conversations separate.
       const sessionKey = `agent:main:${agentId}`;
-      const { runId } = await client.runAgent("main", text, sessionKey);
+      const { runId } = await client.runAgent("main", text, sessionKey, attachments);
 
       // Create placeholder assistant message for streaming
       const assistantMsg: ChatMessage = {

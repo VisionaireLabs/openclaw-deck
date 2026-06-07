@@ -69,6 +69,8 @@ export interface ChatMessage {
   };
   /** Run ID from gateway for tracking streaming responses */
   runId?: string;
+  /** Attached images (data URLs for local preview) */
+  attachments?: Array<{ name: string; dataUrl: string; mimeType: string }>;
   /** Compaction metadata (present when role === "compaction") */
   compaction?: {
     beforeTokens: number;

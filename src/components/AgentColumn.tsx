@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, useRef, type KeyboardEvent, type ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -103,7 +103,16 @@ function MessageBubble({
         }
       >
         {isUser ? (
-          message.text
+          <>
+            {message.attachments && message.attachments.length > 0 && (
+              <div className={styles.msgAttachments}>
+                {message.attachments.map((att, i) => (
+                  <img key={i} src={att.dataUrl} alt={att.name} className={styles.msgAttachmentImg} />
+                ))}
+              </div>
+            )}
+            {message.text.trim()}
+          </>
         ) : (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
@@ -172,14 +181,14 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 
 function getContextWindow(model?: string): number {
   if (!model) return 200000; // default
-  
+
   // Match partial model names
   for (const [key, size] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
     if (model.toLowerCase().includes(key.toLowerCase())) {
       return size;
     }
   }
-  
+
   return 200000; // default fallback
 }
 
@@ -192,6 +201,8 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
   const deleteAgentOnGateway = useDeckStore((s) => s.deleteAgentOnGateway);
   const [input, setInput] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [attachments, setAttachments] = useState<Array<{ fileName: string; content: string; mimeType: string; dataUrl: string }>>([]); 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useAutoScroll(session?.messages);
 
   if (!config || !session) return null;
@@ -203,9 +214,34 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text && attachments.length === 0) return;
+    const toSend = attachments.map(({ dataUrl: _d, ...rest }) => rest as { fileName: string; content: string; mimeType: string });
     setInput("");
-    send(text);
+    setAttachments([]);
+    send(text || " ", toSend.length > 0 ? toSend : undefined);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        // dataUrl = "data:<mimeType>;base64,<content>"
+        const base64 = dataUrl.split(",")[1];
+        setAttachments((prev) => [
+          ...prev,
+          { fileName: file.name, content: base64, mimeType: file.type, dataUrl },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+    // reset so same file can be re-attached
+    e.target.value = "";
+  };
+
+  const removeAttachment = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -231,15 +267,15 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
 
   // Determine if agent has completed work ready to review
   const lastMessage = session.messages[session.messages.length - 1];
-  const hasCompletedWork = 
+  const hasCompletedWork =
     session.status === "idle" &&
     session.messages.length > 0 &&
     lastMessage?.role === "assistant" &&
     !lastMessage?.streaming;
 
   return (
-    <div 
-      className={styles.column} 
+    <div
+      className={styles.column}
       data-status={session.status}
       data-has-completed-work={hasCompletedWork}
     >
@@ -273,9 +309,9 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
             <FailoverBadge session={session} />
           </div>
           <div className={styles.headerUsage}>
-            <span style={{ 
-              opacity: contextPercent > 80 ? 1 : 0.6, 
-              color: contextPercent > 90 ? '#ef4444' : contextPercent > 80 ? '#f59e0b' : 'inherit' 
+            <span style={{
+              opacity: contextPercent > 80 ? 1 : 0.6,
+              color: contextPercent > 90 ? '#ef4444' : contextPercent > 80 ? '#f59e0b' : 'inherit'
             }}>
               {totalTokens.toLocaleString()} tokens · {contextPercent.toFixed(1)}% of context
             </span>
@@ -326,7 +362,40 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
 
       {/* Input */}
       <div className={styles.inputArea}>
+        {attachments.length > 0 && (
+          <div className={styles.attachmentPreviews}>
+            {attachments.map((att, idx) => (
+              <div key={idx} className={styles.attachmentChip}>
+                <img src={att.dataUrl} alt={att.fileName} className={styles.attachmentThumb} />
+                <span className={styles.attachmentName}>{att.fileName}</span>
+                <button
+                  className={styles.attachmentRemove}
+                  onClick={() => removeAttachment(idx)}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className={styles.inputWrapper}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className={styles.fileInput}
+            onChange={handleFileChange}
+          />
+          <button
+            className={styles.attachBtn}
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach image"
+            type="button"
+          >
+            📎
+          </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -341,9 +410,9 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
           <button
             className={styles.sendBtn}
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!input.trim() && attachments.length === 0}
             style={
-              input.trim()
+              input.trim() || attachments.length > 0
                 ? { backgroundColor: config.accent, color: "#000" }
                 : undefined
             }

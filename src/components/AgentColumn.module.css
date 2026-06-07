@@ -490,6 +490,102 @@
   cursor: pointer;
 }
 
+/* ─── Attach button ─── */
+.fileInput {
+  display: none;
+}
+
+.attachBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--theme-borderLight);
+  background: transparent;
+  color: var(--theme-textMuted);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  align-self: flex-end;
+  margin-bottom: 1px;
+}
+
+.attachBtn:hover {
+  background: var(--theme-columnBgAlt);
+  color: var(--theme-textSecondary);
+}
+
+/* ─── Attachment previews (above input) ─── */
+.attachmentPreviews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.attachmentChip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--theme-inputBg);
+  border: 1px solid var(--theme-inputBorder);
+  border-radius: 6px;
+  padding: 4px 6px;
+  max-width: 180px;
+}
+
+.attachmentThumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.attachmentName {
+  font-size: 10px;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--theme-textMuted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.attachmentRemove {
+  background: none;
+  border: none;
+  color: var(--theme-textMuted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.attachmentRemove:hover {
+  color: #ef4444;
+}
+
+/* ─── Attached images in message bubbles ─── */
+.msgAttachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.msgAttachmentImg {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+}
+
 /* ─── Streaming indicator bar ─── */
 .streamingBar {
   position: absolute;

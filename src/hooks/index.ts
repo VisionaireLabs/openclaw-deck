@@ -46,7 +46,8 @@ export function useAgentConfig(agentId: string): AgentConfig | undefined {
 export function useSendMessage(agentId: string) {
   const sendMessage = useDeckStore((s) => s.sendMessage);
   return useCallback(
-    (text: string) => sendMessage(agentId, text),
+    (text: string, attachments?: Array<{ fileName: string; content: string; mimeType: string }>) =>
+      sendMessage(agentId, text, attachments),
     [agentId, sendMessage]
   );
 }
