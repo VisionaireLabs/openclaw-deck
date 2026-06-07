@@ -503,3 +503,4 @@ export function applyTheme(theme: Theme) {
   Object.entries(theme.colors).forEach(([key, value]) => {
     root.style.setProperty(`--theme-${key}`, value);
   });
+}
