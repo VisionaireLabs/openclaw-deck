@@ -216,6 +216,7 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
     const text = input.trim();
     if (!text && attachments.length === 0) return;
     const toSend = attachments.map(({ dataUrl: _d, ...rest }) => rest as { fileName: string; content: string; mimeType: string });
+    console.log('[deck] handleSend attachments:', toSend.length, toSend.map(a => ({ fileName: a.fileName, mimeType: a.mimeType, contentLength: a.content.length })));
     setInput("");
     setAttachments([]);
     send(text || " ", toSend.length > 0 ? toSend : undefined);

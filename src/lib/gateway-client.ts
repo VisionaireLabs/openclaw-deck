@@ -157,13 +157,15 @@ export class GatewayClient {
       .toString(36)
       .slice(2, 8)}`;
 
-    await this.request("chat.send", {
+    const payload = {
       sessionKey: sessionKey ?? `agent:main:${agentId}`,
       message,
       deliver: false,
       idempotencyKey,
       ...(attachments && attachments.length > 0 ? { attachments } : {}),
-    });
+    };
+    console.log('[deck] chat.send payload keys:', Object.keys(payload), 'attachments:', attachments?.length ?? 0);
+    await this.request("chat.send", payload);
 
     return { runId: idempotencyKey, status: "ok" };
   }

@@ -83,6 +83,27 @@ export default function App() {
   const [authed, setAuthed] = useState(() => isAuthenticated());
   const [activeTab, setActiveTab] = useState("All Agents");
   const [showAddModal, setShowAddModal] = useState(false);
+  const gatewayConnected = useDeckStore((s) => s.gatewayConnected);
+  const [hadConnection, setHadConnection] = useState(false);
+
+  // Track first successful connection
+  useEffect(() => {
+    if (gatewayConnected) setHadConnection(true);
+  }, [gatewayConnected]);
+
+  // If we had a connection and it dropped, kick back to login
+  useEffect(() => {
+    if (hadConnection && !gatewayConnected && authed) {
+      // Give 8s for auto-reconnect before showing login
+      const timer = setTimeout(() => {
+        if (!useDeckStore.getState().gatewayConnected) {
+          setAuthed(false);
+          setHadConnection(false);
+        }
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [hadConnection, gatewayConnected, authed]);
   // Use persisted agents if available, otherwise fall back to all defaults
   const persistedAgents = useDeckStore((s) => (s as any).persistedAgents as AgentConfig[] | undefined);
   const [initialAgents] = useState<AgentConfig[]>(() => {
