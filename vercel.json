@@ -1,0 +1,5 @@
+{
+  "buildCommand": "echo 'using pre-built assets'",
+  "outputDirectory": "deck",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
