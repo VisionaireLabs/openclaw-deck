@@ -322,16 +322,22 @@ export class GatewayClient {
     if (this._handshakeDone) return;
     this._handshakeDone = true;
     try {
+      // Only build device identity when we don't have a token — when a token
+      // is present, token-only auth is sufficient and sending an unregistered
+      // device identity causes the gateway to reject with
+      // "pairing required: device is not approved yet".
       let device:
         | { id: string; publicKey: string; signature: string; signedAt: number; nonce?: string }
         | undefined;
-      try {
-        device = await this.buildSignedDeviceIdentity(nonce);
-      } catch (deviceErr) {
-        console.warn(
-          "[GatewayClient] Device identity unavailable; falling back to token-only auth:",
-          deviceErr
-        );
+      if (!this.getPreferredAuthToken()) {
+        try {
+          device = await this.buildSignedDeviceIdentity(nonce);
+        } catch (deviceErr) {
+          console.warn(
+            "[GatewayClient] Device identity unavailable; falling back to token-only auth:",
+            deviceErr
+          );
+        }
       }
 
       const hello = (await this.request("connect", {
