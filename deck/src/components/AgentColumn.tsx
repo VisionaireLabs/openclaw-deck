@@ -206,6 +206,10 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
   const config = useAgentConfig(agentId);
   const send = useSendMessage(agentId);
   const deleteAgentOnGateway = useDeckStore((s) => s.deleteAgentOnGateway);
+  const activeTheme = useDeckStore((s) => s.theme);
+  const isMono = activeTheme === 'mono';
+  const monoAccent = 'rgba(255, 255, 255, 0.75)';
+  const effectiveAccent = isMono ? monoAccent : (config?.accent ?? monoAccent);
   const [input, setInput] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -332,9 +336,9 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
         <div
           className={styles.agentIcon}
           style={{
-            color: config.accent,
-            backgroundColor: `${config.accent}15`,
-            borderColor: `${config.accent}30`,
+            color: effectiveAccent,
+            backgroundColor: `${effectiveAccent}15`,
+            borderColor: `${effectiveAccent}30`,
           }}
         >
           {columnIndex + 1}
@@ -342,14 +346,14 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
         <div className={styles.headerInfo}>
           <div className={styles.headerRow}>
             <span className={styles.agentName}>{config.name}</span>
-            <StatusBadge status={session.status} accent={config.accent} />
+            <StatusBadge status={session.status} accent={effectiveAccent} />
           </div>
           <div className={styles.headerMeta}>
             {config.context ? <span>{config.context}</span> : null}
             {config.model && (
               <>
                 {config.context ? <span className={styles.metaDot}>·</span> : null}
-                <span style={{ color: config.accent, opacity: 0.5 }}>
+                <span style={{ color: effectiveAccent, opacity: 0.5 }}>
                   {config.model}
                 </span>
               </>
@@ -392,7 +396,7 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
           <div className={styles.emptyState}>
             <div
               className={styles.emptyIcon}
-              style={{ color: config.accent }}
+              style={{ color: effectiveAccent }}
             >
               {columnIndex + 1}
             </div>
@@ -403,7 +407,7 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
           msg.role === "compaction" ? (
             <CompactionDivider key={msg.id} message={msg} />
           ) : (
-            <MessageBubble key={msg.id} message={msg} accent={config.accent} />
+            <MessageBubble key={msg.id} message={msg} accent={effectiveAccent} />
           )
         )}
       </div>
@@ -469,7 +473,7 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
             disabled={!input.trim() && pendingAttachments.length === 0}
             style={
               (input.trim() || pendingAttachments.length > 0)
-                ? { backgroundColor: config.accent, color: "#000" }
+                ? { backgroundColor: effectiveAccent, color: "#000" }
                 : undefined
             }
           >
@@ -479,7 +483,7 @@ export function AgentColumn({ agentId, columnIndex }: { agentId: string; columnI
         {isActive && (
           <div
             className={styles.streamingBar}
-            style={{ backgroundColor: config.accent }}
+            style={{ backgroundColor: effectiveAccent }}
           />
         )}
       </div>
